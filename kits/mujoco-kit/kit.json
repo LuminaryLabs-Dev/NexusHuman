@@ -1,0 +1,14 @@
+{
+  "id": "nexus.mujoco",
+  "name": "MuJoCo Kit",
+  "version": "0.1.0",
+  "kind": "experimental-physics-provider",
+  "entry": "src/index.ts",
+  "requires": [
+    "n:simulation"
+  ],
+  "provides": [
+    "mujoco:physics"
+  ],
+  "validation": "pending actual Nexus Engine Kit registry compatibility"
+}
