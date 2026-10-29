@@ -1,4 +1,10 @@
 // Deterministic simplified gameplay controller. Not an anatomical dynamics solver.
+// The MS-Human-700 anatomical rig faces +X in its MJCF bind pose, while the
+// gameplay controller uses +Y as forward. Rotate the rig, not the WASD axes.
+export function anatomicalFacingYaw(heading) {
+  return Math.PI / 2 - heading;
+}
+
 export class GameplayMotion {
   constructor(options = {}) {
     this.radius = options.radius ?? 0.26;
