@@ -1,5 +1,5 @@
 import * as THREE from './vendor/three.module.min.js';
-import { GameplayMotion, jointAngle, anatomicalFacingYaw } from './motion.mjs';
+import { GameplayMotion, jointAngle, anatomicalFacingYaw, cameraFollowOffset } from './motion.mjs?v=wasd-camera-2';
 
 const $ = (id) => document.getElementById(id);
 const MODEL_BASE = new URL('../assets/models/ms-human-700/', import.meta.url);
@@ -187,10 +187,10 @@ function frame(now){
     modelRoot.position.set(state.position.x,state.position.y,state.position.z+Math.min(.015,state.speed*.003)*Math.abs(Math.sin(state.phase)));
     modelRoot.rotation.z=anatomicalFacingYaw(state.heading);
     for(const j of joints){const angle=Math.max(j.min,Math.min(j.max,jointAngle(j.name,state.phase,state.speed,state.grounded)));j.hinge.quaternion.setFromAxisAngle(j.axis,angle);}
-    const yaw=state.heading+orbitYaw;
     const pivot=new THREE.Vector3(state.position.x,state.position.y,state.position.z+.9);
     const flat=orbitDistance*Math.cos(orbitElevation);
-    camera.position.set(pivot.x+flat*Math.sin(yaw+.3),pivot.y-flat*Math.cos(yaw+.3),pivot.z+orbitDistance*Math.sin(orbitElevation)+.4);
+    const follow=cameraFollowOffset(state.heading,orbitYaw,flat);
+    camera.position.set(pivot.x+follow.x,pivot.y+follow.y,pivot.z+orbitDistance*Math.sin(orbitElevation)+.4);
     camera.lookAt(pivot);
     $('speed').textContent=state.speed.toFixed(1);$('distance').textContent=state.distance.toFixed(1);$('contact').textContent=state.contacts.toLocaleString();
   }
