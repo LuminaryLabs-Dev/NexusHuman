@@ -1,0 +1,45 @@
+name: NexusHuman Gameplay Validation
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'gameplay/**'
+      - '.github/workflows/gameplay-validation.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  gameplay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate source and fixed-step physics
+        run: |
+          node --check gameplay/app.mjs
+          node --test gameplay/tests/motion.test.mjs
+          node scripts/validate-model-assets.mjs assets/models/ms-human-700/model-manifest.json
+      - name: Install browser harness
+        run: |
+          npm install --no-save playwright@1.57.0
+          npx playwright install --with-deps chromium
+      - name: Serve repository and run real anatomical browser test
+        run: |
+          python3 -m http.server 8000 --bind 127.0.0.1 >/tmp/nexushuman-http.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/gameplay/ >/dev/null; then break; fi
+            sleep 1
+          done
+          node gameplay/tests/browser.mjs
+      - name: Upload screenshots and server log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gameplay-browser-validation
+          path: |
+            gameplay/screenshots/
+            /tmp/nexushuman-http.log
+          if-no-files-found: ignore
