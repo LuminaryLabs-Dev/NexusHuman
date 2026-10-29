@@ -38,6 +38,12 @@ try {
   console.log('Anatomical turn telemetry:', {turnDegrees, gaitActivity});
   assert.ok(turnDegrees > 30, 'Arrow-left must accelerate heading');
   assert.ok(gaitActivity > 10, 'Turn-in-place must trigger a body stepping pose');
+  const rig=await page.evaluate(()=>window.NexusHumanDiagnostics());
+  assert.equal(rig.ready,true,'model must be fully rigged');
+  for(const [name,minimum] of [['pelvis_rotation',0.025],['L5_S1_AR',0.02],['T12_L1_AR',0.01],['T1_head_neck_AR',0.02],['hip_rotation_r',0.02],['hip_rotation_l',0.02]]) {
+    assert.ok(rig.angles[name] > minimum,`${name}: actual rig quaternion must articulate during turn`);
+  }
+  console.log('Rig joint articulation (radians):',rig.angles);
   await page.screenshot({path:'gameplay/screenshots/anatomical-turn.png',fullPage:true});
   await page.keyboard.up('ArrowLeft');
   const distance = await page.locator('#distance').innerText();
