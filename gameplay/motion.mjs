@@ -38,6 +38,11 @@ export class GameplayMotion {
     this.phase = 0;
     this.time = 0;
     this.contacts = 0;
+    this.jumpStage = 'grounded';
+    this.jumpTimer = 0;
+    this.jumpHeld = false;
+    this.airborneTime = 0;
+    this.landingImpact = 0;
   }
   step(dt, input = {}) {
     if (!Number.isFinite(dt) || dt <= 0 || dt > 0.1) throw new RangeError('Fixed step must be 0 < dt <= 0.1');
@@ -53,7 +58,32 @@ export class GameplayMotion {
     const responsiveness = 1 - Math.exp(-(forward || strafe ? this.acceleration : this.friction) * dt);
     this.velocity.x += (targetX - this.velocity.x) * responsiveness;
     this.velocity.y += (targetY - this.velocity.y) * responsiveness;
-    if (this.grounded && input.jump) { this.velocity.z = 4.2; this.grounded = false; }
+    // A jump press first loads the legs, then launches. Holding Space does not
+    // retrigger a jump on landing.
+    const jumpPressed = !!input.jump && !this.jumpHeld;
+    this.jumpHeld = !!input.jump;
+    if (jumpPressed && this.grounded && this.jumpStage === 'grounded') {
+      this.jumpStage = 'anticipation';
+      this.jumpTimer = 0;
+    }
+    if (this.jumpStage === 'anticipation') {
+      this.jumpTimer += dt;
+      if (this.jumpTimer >= 0.14) {
+        this.jumpStage = 'airborne';
+        this.jumpTimer = 0;
+        this.airborneTime = 0;
+        this.velocity.z = 4.8;
+        this.grounded = false;
+      }
+    } else if (this.jumpStage === 'landing') {
+      this.jumpTimer += dt;
+      if (this.jumpTimer >= 0.30) {
+        this.jumpStage = 'grounded';
+        this.jumpTimer = 0;
+        this.landingImpact = 0;
+      }
+    }
+    if (this.jumpStage === 'airborne') this.airborneTime += dt;
     this.velocity.z -= this.gravity * dt;
     const oldX = this.position.x, oldY = this.position.y;
     this.position.x += this.velocity.x * dt;
@@ -74,7 +104,14 @@ export class GameplayMotion {
     }
     this.position.z += this.velocity.z * dt;
     if (this.position.z <= 0) {
-      if (this.velocity.z < 0 && !this.grounded) this.contacts++;
+      if (this.velocity.z < 0 && !this.grounded) {
+        this.contacts++;
+        if (this.jumpStage === 'airborne') {
+          this.jumpStage = 'landing';
+          this.jumpTimer = 0;
+          this.landingImpact = Math.max(0, Math.min(1, -this.velocity.z / 6));
+        }
+      }
       this.position.z = 0;
       this.velocity.z = 0;
       this.grounded = true;
@@ -86,7 +123,9 @@ export class GameplayMotion {
     return this.snapshot();
   }
   snapshot() {
-    return {position: {...this.position}, velocity: {...this.velocity}, heading: this.heading, turnVelocity: this.turnVelocity, grounded: this.grounded, distance: this.distance, phase: this.phase, time: this.time, contacts: this.contacts, speed: Math.hypot(this.velocity.x, this.velocity.y)};
+    return {position: {...this.position}, velocity: {...this.velocity}, heading: this.heading, turnVelocity: this.turnVelocity, grounded: this.grounded,
+      jumpStage:this.jumpStage, jumpTimer:this.jumpTimer, airTime:this.airborneTime,
+      landingImpact:this.landingImpact, height:this.position.z, distance: this.distance, phase: this.phase, time: this.time, contacts: this.contacts, speed: Math.hypot(this.velocity.x, this.velocity.y)};
   }
 }
 export function jointAngle(name, phase, speed, grounded) {
