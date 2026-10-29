@@ -5,6 +5,17 @@ export function anatomicalFacingYaw(heading) {
   return Math.PI / 2 - heading;
 }
 
+// Keep the chase camera BEHIND the character's controller-facing direction.
+// The controller uses +Y at heading 0; positive heading rotates toward +X.
+// Orbiting changes the camera view but does not swap the movement keys.
+export function cameraFollowOffset(heading, orbitYaw, distance) {
+  if (![heading, orbitYaw, distance].every(Number.isFinite) || distance <= 0) {
+    throw new RangeError('Invalid camera follow parameters');
+  }
+  const angle = heading + orbitYaw;
+  return { x: -Math.sin(angle) * distance, y: -Math.cos(angle) * distance };
+}
+
 export class GameplayMotion {
   constructor(options = {}) {
     this.radius = options.radius ?? 0.26;
