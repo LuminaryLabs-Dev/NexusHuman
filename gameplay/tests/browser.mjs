@@ -47,6 +47,8 @@ try {
   await page.screenshot({path:'gameplay/screenshots/anatomical-turn.png',fullPage:true});
   await page.keyboard.up('ArrowLeft');
   // Exercise the entire physically staged jump against the real articulated rig.
+  const preJumpDistance = Number(await page.locator('#distance').innerText());
+  assert.ok(preJumpDistance > 0.5, 'W key must move the character before Reset');
   await page.keyboard.press('r');
   await page.waitForFunction(()=>window.NexusHumanDiagnostics()?.motion?.jumpStage==='grounded',undefined,{timeout:10000});
   const idleFooting=await page.evaluate(()=>window.NexusHumanDiagnostics()?.footIK);
@@ -77,7 +79,8 @@ try {
   const speed = await page.locator('#speed').innerText();
   const fps = await page.locator('#fps').innerText();
   console.log('Gameplay movement telemetry:', { distance, speed, fps, errors });
-  assert.ok(Number(distance) > 0.5, 'Keyboard must produce movement');
+  assert.ok(preJumpDistance > 0.5, 'W key must produce movement');
+  assert.equal(Number(distance),0,'Reset should clear travel distance');
   assert.deepEqual(errors, []);
   await page.screenshot({ path: 'gameplay/screenshots/desktop.png', fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
