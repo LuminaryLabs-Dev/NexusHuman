@@ -91,13 +91,13 @@ async function loadGeometry(url, scale) {
 const obstacleDefs=[{x:-2,y:2,radius:.53,height:1.2},{x:2,y:3,radius:.65,height:1.4},{x:0,y:5,radius:.45,height:.8}];
 const motion=new GameplayMotion({obstacles:obstacleDefs});
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
-renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.75));renderer.setClearColor(0x0b1926);
-renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.25));renderer.setClearColor(0x0b1926);
+renderer.shadowMap.enabled=false;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 $('viewport').appendChild(renderer.domElement);
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x0b1926);scene.fog=new THREE.Fog(0x0b1926,12,45);
 const camera=new THREE.PerspectiveCamera(50,1,.05,90);camera.up.set(0,0,1);
 scene.add(new THREE.HemisphereLight(0xc7edff,0x233e4c,2));
-const sun=new THREE.DirectionalLight(0xfff0d5,2.4);sun.position.set(5,-3,9);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);
+const sun=new THREE.DirectionalLight(0xfff0d5,2.4);sun.position.set(5,-3,9);sun.castShadow=true;sun.shadow.mapSize.set(512,512);
 sun.shadow.camera.left=-10;sun.shadow.camera.right=10;sun.shadow.camera.top=10;sun.shadow.camera.bottom=-10;scene.add(sun);
 const floor=new THREE.Mesh(new THREE.PlaneGeometry(60,60),new THREE.MeshStandardMaterial({color:0x173b43,roughness:.93,metalness:0.05}));floor.receiveShadow=true;floor.position.z=-.016;scene.add(floor);
 const grid=new THREE.GridHelper(60,60,0x3d8f8e,0x24535d);grid.rotation.x=Math.PI/2;grid.position.z=.002;scene.add(grid);
