@@ -44,3 +44,30 @@ test('articulated joint angles are finite and bounded',()=>{
   assert.ok(Number.isFinite(pelvisOffsets(p).up));
 });
 test('reject invalid frame delta',()=>assert.throws(()=>new AnatomicalGait().update(0,moving()),RangeError));
+
+test('pre-jump compression visibly bends both hips and knees',()=>{
+ const gait=new AnatomicalGait();
+ let pose;for(let i=0;i<18;i++)pose=gait.update(1/120,moving({phase:0,velocity:{x:0,y:0},jumpStage:'anticipation',jumpTimer:(i+1)/120}));
+ assert.ok(pose.jumpCrouch>.45);
+ assert.ok(anatomicalJointPose('knee_angle_r',pose)>.45);
+ assert.ok(anatomicalJointPose('knee_angle_l',pose)>.45);
+ assert.ok(pelvisOffsets(pose).up<-.04);
+});
+test('airborne pose spreads the legs, tucks knees and lifts arms',()=>{
+ const gait=new AnatomicalGait();
+ let pose;for(let i=0;i<36;i++)pose=gait.update(1/120,moving({grounded:false,velocity:{x:0,y:0,z:0},jumpStage:'airborne'}));
+ assert.ok(pose.jumpSpread>.65);assert.ok(pose.jumpTuck>.5);
+ const left=anatomicalJointPose('hip_adduction_l',pose),right=anatomicalJointPose('hip_adduction_r',pose);
+ assert.ok(left*right<0,'legs spread in opposite lateral directions');
+ assert.ok(anatomicalJointPose('knee_angle_l',pose)>.3);
+ assert.ok(anatomicalJointPose('elv_angle_l',pose)>.2);
+});
+test('landing compresses then eases back toward standing',()=>{
+ const gait=new AnatomicalGait();
+ let impact;for(let i=0;i<12;i++)impact=gait.update(1/120,moving({velocity:{x:0,y:0},jumpStage:'landing',landingImpact:1,jumpTimer:i/120}));
+ assert.ok(impact.landingBend>.25);
+ assert.ok(anatomicalJointPose('knee_angle_r',impact)>.15);
+ let recovered;for(let i=0;i<120;i++)recovered=gait.update(1/120,moving({velocity:{x:0,y:0},jumpStage:'grounded'}));
+ assert.ok(recovered.landingBend<.01);
+ assert.ok(Math.abs(pelvisOffsets(recovered).up)<.01);
+});
