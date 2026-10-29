@@ -1,5 +1,5 @@
 import * as THREE from './vendor/three.module.min.js';
-import { GameplayMotion, jointAngle } from './motion.mjs';
+import { GameplayMotion, jointAngle, anatomicalFacingYaw } from './motion.mjs';
 
 const $ = (id) => document.getElementById(id);
 const MODEL_BASE = new URL('../assets/models/ms-human-700/', import.meta.url);
@@ -185,7 +185,7 @@ function frame(now){
   }
   if(modelReady){const state=motion.snapshot();
     modelRoot.position.set(state.position.x,state.position.y,state.position.z+Math.min(.015,state.speed*.003)*Math.abs(Math.sin(state.phase)));
-    modelRoot.rotation.z=-state.heading;
+    modelRoot.rotation.z=anatomicalFacingYaw(state.heading);
     for(const j of joints){const angle=Math.max(j.min,Math.min(j.max,jointAngle(j.name,state.phase,state.speed,state.grounded)));j.hinge.quaternion.setFromAxisAngle(j.axis,angle);}
     const yaw=state.heading+orbitYaw;
     const pivot=new THREE.Vector3(state.position.x,state.position.y,state.position.z+.9);
