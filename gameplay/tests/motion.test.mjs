@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { GameplayMotion, jointAngle, anatomicalFacingYaw } from '../motion.mjs';
+import { GameplayMotion, jointAngle, anatomicalFacingYaw, cameraFollowOffset } from '../motion.mjs';
 test('resting character remains on a stable floor', () => {
   const m = new GameplayMotion();
   for (let i = 0; i < 1000; i++) m.step(1 / 120);
@@ -57,4 +57,20 @@ test('anatomical +X facing agrees with movement forward over different headings'
     assert.ok(Math.abs(Math.cos(yaw) - Math.sin(heading)) < 1e-12, 'forward X mismatch');
     assert.ok(Math.abs(Math.sin(yaw) - Math.cos(heading)) < 1e-12, 'forward Y mismatch');
   }
+});
+
+test('camera follows behind forward movement at every turning angle', () => {
+  for (const heading of [0, Math.PI/4, Math.PI/2, Math.PI, -Math.PI/2, Math.PI*1.75]) {
+    const forward = { x: Math.sin(heading), y: Math.cos(heading) };
+    const right = { x: Math.cos(heading), y: -Math.sin(heading) };
+    const back = cameraFollowOffset(heading, 0, 4);
+    const cameraToTarget = { x: -back.x / 4, y: -back.y / 4 };
+    assert.ok(Math.abs(cameraToTarget.x - forward.x) < 1e-12, 'W must go into screen X');
+    assert.ok(Math.abs(cameraToTarget.y - forward.y) < 1e-12, 'W must go into screen Y');
+    const cameraRight = { x: cameraToTarget.y, y: -cameraToTarget.x };
+    assert.ok(Math.abs(cameraRight.x - right.x) < 1e-12, 'D must be screen right X');
+    assert.ok(Math.abs(cameraRight.y - right.y) < 1e-12, 'D must be screen right Y');
+    assert.ok(Math.abs(Math.hypot(back.x, back.y) - 4) < 1e-12);
+  }
+  assert.throws(() => cameraFollowOffset(0, 0, 0), RangeError);
 });
