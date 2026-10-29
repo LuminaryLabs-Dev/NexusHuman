@@ -1,6 +1,7 @@
 import * as THREE from './vendor/three.module.min.js';
-import { GameplayMotion, anatomicalFacingYaw, cameraFollowOffset } from './motion.mjs?v=anatomical-turn-1';
-import { AnatomicalGait, anatomicalJointPose, pelvisOffsets } from './animation.mjs?v=anatomical-turn-1';
+import { GameplayMotion, anatomicalFacingYaw, cameraFollowOffset } from './motion.mjs?v=jump-ik-1';
+import { AnatomicalGait, anatomicalJointPose, pelvisOffsets } from './animation.mjs?v=jump-ik-1';
+import { FootIK } from './foot-ik.mjs?v=jump-ik-1';
 
 const $ = (id) => document.getElementById(id);
 const MODEL_BASE = new URL('../assets/models/ms-human-700/', import.meta.url);
@@ -109,7 +110,8 @@ for(const ob of obstacleDefs){const mesh=new THREE.Mesh(new THREE.CylinderGeomet
 const modelRoot=new THREE.Group();scene.add(modelRoot);
 const boneMaterial=new THREE.MeshStandardMaterial({color:0xe7c8a5,roughness:.72,metalness:.06,side:THREE.DoubleSide});
 const skinMaterial=new THREE.MeshStandardMaterial({color:0xdba992,transparent:true,opacity:.18,roughness:.8,depthWrite:false,side:THREE.DoubleSide});
-const joints=[], meshJobs=[];
+const joints=[], meshJobs=[], bodyRefs=new Map();
+let footIK=null;
 // Read-only rig diagnostics for automated browser acceptance and game integration.
 window.NexusHumanDiagnostics=()=>{
   const names=['pelvis_rotation','L5_S1_AR','T12_L1_AR','T1_head_neck_AR','hip_rotation_r','hip_rotation_l'];
@@ -119,11 +121,11 @@ window.NexusHumanDiagnostics=()=>{
     const w=Math.max(-1,Math.min(1,Math.abs(joint.hinge.quaternion.w)));
     return [name,2*Math.acos(w)];
   }));
-  return {ready:modelReady,turnVelocity:motion.turnVelocity,pose:currentPose,angles};
+  return {ready:modelReady,turnVelocity:motion.turnVelocity,pose:currentPose,motion:motion.snapshot(),footIK:footIK?.diagnostics()||null,angles};
 };
 let boneCount=0, actuatorCount=0, modelReady=false;
 function buildBody(node,parent,meshes) {
-  const body=new THREE.Group();body.name=node.getAttribute('name')||'body';body.position.copy(vec3(node.getAttribute('pos')));body.quaternion.copy(quatOf(node.getAttribute('quat')));parent.add(body);
+  const body=new THREE.Group();body.name=node.getAttribute('name')||'body';body.position.copy(vec3(node.getAttribute('pos')));body.quaternion.copy(quatOf(node.getAttribute('quat')));parent.add(body);bodyRefs.set(body.name,body);
   let current=body;
   for(const child of [...node.children])if(child.localName==='joint'&&child.getAttribute('type')!=='slide') {
     const pivot=vec3(child.getAttribute('pos'));
@@ -174,19 +176,20 @@ async function loadModel() {
     while(cursor<meshJobs.length){const i=cursor++;await meshJobs[i]();loaded++;$('progress').textContent=`Loading original bone meshes ${loaded}/${meshJobs.length}…`;}
   }));
   if(!boneCount)throw Error('No anatomical bone geometry loaded');
+  footIK=new FootIK(THREE,modelRoot,joints,bodyRefs);
   modelReady=true;
   $('progress').textContent=`Ready · ${boneCount} anatomical meshes · ${actuatorCount} actuator definitions (not simulated muscles)`;
   $('progress').dataset.ready='true';
 }
 const pressed=new Set();let paused=false,orbitYaw=0,orbitElevation=.22,orbitDistance=3.6,drag=null;
-addEventListener('keydown',ev=>{if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;pressed.add(ev.code);if(['Space','ArrowLeft','ArrowRight'].includes(ev.code))ev.preventDefault();if(ev.code==='KeyR'){motion.reset();gait.reset();currentPose=gait.snapshot();}if(ev.code==='KeyP'&&!ev.repeat)togglePause();});
+addEventListener('keydown',ev=>{if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;pressed.add(ev.code);if(['Space','ArrowLeft','ArrowRight'].includes(ev.code))ev.preventDefault();if(ev.code==='KeyR'){motion.reset();gait.reset();footIK?.reset();currentPose=gait.snapshot();}if(ev.code==='KeyP'&&!ev.repeat)togglePause();});
 addEventListener('keyup',ev=>pressed.delete(ev.code));addEventListener('blur',()=>pressed.clear());
 renderer.domElement.addEventListener('pointerdown',ev=>{drag={x:ev.clientX,y:ev.clientY};renderer.domElement.setPointerCapture(ev.pointerId);});
 renderer.domElement.addEventListener('pointermove',ev=>{if(!drag)return;orbitYaw+=(ev.clientX-drag.x)*.007;orbitElevation=Math.max(-.45,Math.min(1.2,orbitElevation+(ev.clientY-drag.y)*.005));drag={x:ev.clientX,y:ev.clientY};});
 renderer.domElement.addEventListener('pointerup',()=>drag=null);renderer.domElement.addEventListener('pointercancel',()=>drag=null);
 renderer.domElement.addEventListener('wheel',ev=>{orbitDistance=Math.max(1.4,Math.min(10,orbitDistance*(1+Math.sign(ev.deltaY)*.08)));ev.preventDefault();},{passive:false});
 function togglePause(){paused=!paused;$('pause').textContent=paused?'Resume':'Pause';}
-$('pause').onclick=togglePause;$('reset').onclick=()=>{motion.reset();gait.reset();currentPose=gait.snapshot();};
+$('pause').onclick=togglePause;$('reset').onclick=()=>{motion.reset();gait.reset();footIK?.reset();currentPose=gait.snapshot();};
 function updateSize(){const w=$('viewport').clientWidth,h=$('viewport').clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
 new ResizeObserver(updateSize).observe($('viewport'));updateSize();
 let last=performance.now(),accumulator=0,frames=0,sampleStart=last;
@@ -202,7 +205,8 @@ function frame(now){
     // Transfer body weight sideways relative to the character's heading.
     modelRoot.position.set(state.position.x+Math.cos(state.heading)*pelvis.side,state.position.y-Math.sin(state.heading)*pelvis.side,state.position.z+pelvis.up);
     modelRoot.rotation.z=anatomicalFacingYaw(state.heading);
-    for(const j of joints){const angle=Math.max(j.min,Math.min(j.max,anatomicalJointPose(j.name,currentPose)));j.hinge.quaternion.setFromAxisAngle(j.axis,angle);}
+    for(const j of joints){const angle=Math.max(j.min,Math.min(j.max,anatomicalJointPose(j.name,currentPose)));j.currentAngle=angle;j.hinge.quaternion.setFromAxisAngle(j.axis,angle);}
+    footIK?.update(currentPose,state);
     const pivot=new THREE.Vector3(state.position.x,state.position.y,state.position.z+.9);
     const flat=orbitDistance*Math.cos(orbitElevation);
     const follow=cameraFollowOffset(state.heading,orbitYaw,flat);
@@ -211,6 +215,8 @@ function frame(now){
     $('speed').textContent=state.speed.toFixed(1);$('distance').textContent=state.distance.toFixed(1);$('contact').textContent=state.contacts.toLocaleString();
     if($('turn'))$('turn').textContent=(state.turnVelocity*180/Math.PI).toFixed(0);
     if($('gait'))$('gait').textContent=(currentPose.weight*100).toFixed(0);
+    if($('jumpstage'))$('jumpstage').textContent=state.jumpStage;
+    if($('footplant'))$('footplant').textContent=footIK ? Object.values(footIK.locked).filter(Boolean).length+'/2' : '--';
   }
   renderer.render(scene,camera);frames++;
   if(now-sampleStart>=500){$('fps').textContent=Math.round(frames*1000/(now-sampleStart));sampleStart=now;frames=0;}
