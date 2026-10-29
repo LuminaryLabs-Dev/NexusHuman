@@ -4,7 +4,7 @@ import { GameplayMotion, jointAngle } from '../motion.mjs';
 test('resting character remains on a stable floor', () => {
   const m = new GameplayMotion();
   for (let i = 0; i < 1000; i++) m.step(1 / 120);
-  assert.equal(m.position.z, 0); assert.equal(m.velocity.z, 0); assert.equal(m.grounded, true);
+  assert.equal(m.position.z, 0); assert.equal(m.velocity.z, 0); assert.equal(m.grounded, true); assert.equal(m.contacts, 0);
 });
 test('forward movement and running work with deterministic fixed steps', () => {
   const a = new GameplayMotion(), b = new GameplayMotion();
