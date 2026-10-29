@@ -114,7 +114,7 @@ const joints=[], meshJobs=[], bodyRefs=new Map();
 let footIK=null;
 // Read-only rig diagnostics for automated browser acceptance and game integration.
 window.NexusHumanDiagnostics=()=>{
-  const names=['pelvis_rotation','L5_S1_AR','T12_L1_AR','T1_head_neck_AR','hip_rotation_r','hip_rotation_l'];
+  const names=['pelvis_rotation','L5_S1_AR','T12_L1_AR','T1_head_neck_AR','hip_rotation_r','hip_rotation_l','hip_adduction_r','hip_adduction_l','knee_angle_r','knee_angle_l','ankle_angle_r','ankle_angle_l','elv_angle_r','elv_angle_l'];
   const angles=Object.fromEntries(names.map(name=>{
     const joint=joints.find(j=>j.name===name);
     if(!joint)return [name,null];
