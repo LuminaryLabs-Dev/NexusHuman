@@ -24,6 +24,7 @@ export class GameplayMotion {
     this.runSpeed = options.runSpeed ?? 4.5;
     this.acceleration = options.acceleration ?? 12;
     this.friction = options.friction ?? 10;
+    this.turnResponse = options.turnResponse ?? 9;
     this.obstacles = options.obstacles ?? [];
     this.reset();
   }
@@ -31,6 +32,7 @@ export class GameplayMotion {
     this.position = { x: 0, y: 0, z: 0 };
     this.velocity = { x: 0, y: 0, z: 0 };
     this.heading = 0;
+    this.turnVelocity = 0;
     this.grounded = true;
     this.distance = 0;
     this.phase = 0;
@@ -43,7 +45,9 @@ export class GameplayMotion {
     const strafe = (input.right ? 1 : 0) - (input.left ? 1 : 0);
     const mag = Math.hypot(forward, strafe) || 1;
     const speed = input.run ? this.runSpeed : this.walkSpeed;
-    this.heading += ((input.turnLeft ? 1 : 0) - (input.turnRight ? 1 : 0)) * 2.5 * dt;
+    const requestedTurn = ((input.turnLeft ? 1 : 0) - (input.turnRight ? 1 : 0)) * 2.5;
+    this.turnVelocity += (requestedTurn - this.turnVelocity) * (1 - Math.exp(-this.turnResponse * dt));
+    this.heading += this.turnVelocity * dt;
     const targetX = (Math.sin(this.heading) * forward + Math.cos(this.heading) * strafe) * speed / mag;
     const targetY = (Math.cos(this.heading) * forward - Math.sin(this.heading) * strafe) * speed / mag;
     const responsiveness = 1 - Math.exp(-(forward || strafe ? this.acceleration : this.friction) * dt);
@@ -77,12 +81,12 @@ export class GameplayMotion {
     } else this.grounded = false;
     const moved = Math.hypot(this.position.x - oldX, this.position.y - oldY);
     this.distance += moved;
-    if (this.grounded) this.phase += moved * 4.8;
+    if (this.grounded) this.phase += moved * 4.8 + Math.abs(this.turnVelocity) * dt * 2.1;
     this.time += dt;
     return this.snapshot();
   }
   snapshot() {
-    return {position: {...this.position}, velocity: {...this.velocity}, heading: this.heading, grounded: this.grounded, distance: this.distance, phase: this.phase, time: this.time, contacts: this.contacts, speed: Math.hypot(this.velocity.x, this.velocity.y)};
+    return {position: {...this.position}, velocity: {...this.velocity}, heading: this.heading, turnVelocity: this.turnVelocity, grounded: this.grounded, distance: this.distance, phase: this.phase, time: this.time, contacts: this.contacts, speed: Math.hypot(this.velocity.x, this.velocity.y)};
   }
 }
 export function jointAngle(name, phase, speed, grounded) {
