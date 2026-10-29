@@ -1,5 +1,6 @@
 import * as THREE from './vendor/three.module.min.js';
-import { GameplayMotion, jointAngle, anatomicalFacingYaw, cameraFollowOffset } from './motion.mjs?v=wasd-camera-2';
+import { GameplayMotion, anatomicalFacingYaw, cameraFollowOffset } from './motion.mjs?v=anatomical-turn-1';
+import { AnatomicalGait, anatomicalJointPose, pelvisOffsets } from './animation.mjs?v=anatomical-turn-1';
 
 const $ = (id) => document.getElementById(id);
 const MODEL_BASE = new URL('../assets/models/ms-human-700/', import.meta.url);
@@ -90,6 +91,8 @@ async function loadGeometry(url, scale) {
 }
 const obstacleDefs=[{x:-2,y:2,radius:.53,height:1.2},{x:2,y:3,radius:.65,height:1.4},{x:0,y:5,radius:.45,height:.8}];
 const motion=new GameplayMotion({obstacles:obstacleDefs});
+const gait=new AnatomicalGait();
+let currentPose=gait.snapshot();
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
 renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.25));renderer.setClearColor(0x0b1926);
 renderer.shadowMap.enabled=false;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
@@ -165,14 +168,14 @@ async function loadModel() {
   $('progress').dataset.ready='true';
 }
 const pressed=new Set();let paused=false,orbitYaw=0,orbitElevation=.22,orbitDistance=3.6,drag=null;
-addEventListener('keydown',ev=>{if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;pressed.add(ev.code);if(['Space','ArrowLeft','ArrowRight'].includes(ev.code))ev.preventDefault();if(ev.code==='KeyR')motion.reset();if(ev.code==='KeyP'&&!ev.repeat)togglePause();});
+addEventListener('keydown',ev=>{if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;pressed.add(ev.code);if(['Space','ArrowLeft','ArrowRight'].includes(ev.code))ev.preventDefault();if(ev.code==='KeyR'){motion.reset();gait.reset();currentPose=gait.snapshot();}if(ev.code==='KeyP'&&!ev.repeat)togglePause();});
 addEventListener('keyup',ev=>pressed.delete(ev.code));addEventListener('blur',()=>pressed.clear());
 renderer.domElement.addEventListener('pointerdown',ev=>{drag={x:ev.clientX,y:ev.clientY};renderer.domElement.setPointerCapture(ev.pointerId);});
 renderer.domElement.addEventListener('pointermove',ev=>{if(!drag)return;orbitYaw+=(ev.clientX-drag.x)*.007;orbitElevation=Math.max(-.45,Math.min(1.2,orbitElevation+(ev.clientY-drag.y)*.005));drag={x:ev.clientX,y:ev.clientY};});
 renderer.domElement.addEventListener('pointerup',()=>drag=null);renderer.domElement.addEventListener('pointercancel',()=>drag=null);
 renderer.domElement.addEventListener('wheel',ev=>{orbitDistance=Math.max(1.4,Math.min(10,orbitDistance*(1+Math.sign(ev.deltaY)*.08)));ev.preventDefault();},{passive:false});
 function togglePause(){paused=!paused;$('pause').textContent=paused?'Resume':'Pause';}
-$('pause').onclick=togglePause;$('reset').onclick=()=>motion.reset();
+$('pause').onclick=togglePause;$('reset').onclick=()=>{motion.reset();gait.reset();currentPose=gait.snapshot();};
 function updateSize(){const w=$('viewport').clientWidth,h=$('viewport').clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
 new ResizeObserver(updateSize).observe($('viewport'));updateSize();
 let last=performance.now(),accumulator=0,frames=0,sampleStart=last;
@@ -180,19 +183,23 @@ function frame(now){
   const dt=Math.min(.06,(now-last)/1000);last=now;
   if(!paused&&modelReady){
     accumulator+=dt;let n=0;
-    while(accumulator>=1/120&&n<8){motion.step(1/120,{forward:pressed.has('KeyW'),backward:pressed.has('KeyS'),left:pressed.has('KeyA'),right:pressed.has('KeyD'),run:pressed.has('ShiftLeft')||pressed.has('ShiftRight'),jump:pressed.has('Space'),turnLeft:pressed.has('ArrowLeft'),turnRight:pressed.has('ArrowRight')});accumulator-=1/120;n++;}
+    while(accumulator>=1/120&&n<8){const step=motion.step(1/120,{forward:pressed.has('KeyW'),backward:pressed.has('KeyS'),left:pressed.has('KeyA'),right:pressed.has('KeyD'),run:pressed.has('ShiftLeft')||pressed.has('ShiftRight'),jump:pressed.has('Space'),turnLeft:pressed.has('ArrowLeft'),turnRight:pressed.has('ArrowRight')});currentPose=gait.update(1/120,step);accumulator-=1/120;n++;}
     if(n===8)accumulator=0;
   }
   if(modelReady){const state=motion.snapshot();
-    modelRoot.position.set(state.position.x,state.position.y,state.position.z+Math.min(.015,state.speed*.003)*Math.abs(Math.sin(state.phase)));
+    const pelvis=pelvisOffsets(currentPose);
+    // Transfer body weight sideways relative to the character's heading.
+    modelRoot.position.set(state.position.x+Math.cos(state.heading)*pelvis.side,state.position.y-Math.sin(state.heading)*pelvis.side,state.position.z+pelvis.up);
     modelRoot.rotation.z=anatomicalFacingYaw(state.heading);
-    for(const j of joints){const angle=Math.max(j.min,Math.min(j.max,jointAngle(j.name,state.phase,state.speed,state.grounded)));j.hinge.quaternion.setFromAxisAngle(j.axis,angle);}
+    for(const j of joints){const angle=Math.max(j.min,Math.min(j.max,anatomicalJointPose(j.name,currentPose)));j.hinge.quaternion.setFromAxisAngle(j.axis,angle);}
     const pivot=new THREE.Vector3(state.position.x,state.position.y,state.position.z+.9);
     const flat=orbitDistance*Math.cos(orbitElevation);
     const follow=cameraFollowOffset(state.heading,orbitYaw,flat);
     camera.position.set(pivot.x+follow.x,pivot.y+follow.y,pivot.z+orbitDistance*Math.sin(orbitElevation)+.4);
     camera.lookAt(pivot);
     $('speed').textContent=state.speed.toFixed(1);$('distance').textContent=state.distance.toFixed(1);$('contact').textContent=state.contacts.toLocaleString();
+    if($('turn'))$('turn').textContent=(state.turnVelocity*180/Math.PI).toFixed(0);
+    if($('gait'))$('gait').textContent=(currentPose.weight*100).toFixed(0);
   }
   renderer.render(scene,camera);frames++;
   if(now-sampleStart>=500){$('fps').textContent=Math.round(frames*1000/(now-sampleStart));sampleStart=now;frames=0;}
