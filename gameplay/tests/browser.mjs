@@ -74,6 +74,8 @@ try {
   const landed=await page.evaluate(()=>window.NexusHumanDiagnostics());
   assert.ok(landed.motion.grounded,'Jump must return to solid floor');
   assert.ok(landed.motion.contacts>=1,'Landing must produce a contact event');
+  assert.ok(landed.footIK.chainCount===2,'Both anatomical leg IK chains remain connected');
+  for(const side of ['l','r']) assert.ok(landed.footIK.error[side]<.15,`Landing ${side} stance foot IK error must stay bounded`);
   console.log('Jump recovered:',{stage:landed.motion.jumpStage,contacts:landed.motion.contacts,feet:landed.footIK});
   const distance = await page.locator('#distance').innerText();
   const speed = await page.locator('#speed').innerText();
