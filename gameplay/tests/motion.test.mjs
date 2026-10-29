@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { GameplayMotion, jointAngle } from '../motion.mjs';
+import { GameplayMotion, jointAngle, anatomicalFacingYaw } from '../motion.mjs';
 test('resting character remains on a stable floor', () => {
   const m = new GameplayMotion();
   for (let i = 0; i < 1000; i++) m.step(1 / 120);
@@ -31,4 +31,30 @@ test('joint drive has alternate phases and zero output at rest', () => {
 test('invalid delta rejected', () => {
   assert.throws(() => new GameplayMotion().step(0), RangeError);
   assert.throws(() => new GameplayMotion().step(1), RangeError);
+});
+
+test('W/S are forward and backward; A/D are left and right, not swapped', () => {
+  const directions = [
+    ['W', {forward: true}, 'y', 1],
+    ['S', {backward: true}, 'y', -1],
+    ['A', {left: true}, 'x', -1],
+    ['D', {right: true}, 'x', 1]
+  ];
+  for (const [key, input, axis, sign] of directions) {
+    const movement = new GameplayMotion();
+    for (let i = 0; i < 120; i++) movement.step(1/120, input);
+    assert.ok(movement.position[axis] * sign > 1, `${key}: incorrect direction on ${axis}`);
+    const perpendicular = axis === 'x' ? 'y' : 'x';
+    assert.ok(Math.abs(movement.position[perpendicular]) < 1e-9, `${key}: unexpected sideways motion`);
+  }
+});
+
+test('anatomical +X facing agrees with movement forward over different headings', () => {
+  // MJCF anatomical forward is the character's local +X vector.
+  // Root rotation must map it to controller world forward [sin(h), cos(h)].
+  for (const heading of [0, Math.PI/4, Math.PI/2, Math.PI, -Math.PI/2]) {
+    const yaw = anatomicalFacingYaw(heading);
+    assert.ok(Math.abs(Math.cos(yaw) - Math.sin(heading)) < 1e-12, 'forward X mismatch');
+    assert.ok(Math.abs(Math.sin(yaw) - Math.cos(heading)) < 1e-12, 'forward Y mismatch');
+  }
 });
