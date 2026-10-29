@@ -1,7 +1,7 @@
 import * as THREE from './vendor/three.module.min.js';
-import { GameplayMotion, anatomicalFacingYaw, cameraFollowOffset } from './motion.mjs?v=jump-ik-1';
-import { AnatomicalGait, anatomicalJointPose, pelvisOffsets } from './animation.mjs?v=jump-ik-1';
-import { FootIK } from './foot-ik.mjs?v=jump-ik-1';
+import { GameplayMotion, anatomicalFacingYaw, cameraFollowOffset } from './motion.mjs?v=jump-ik-2';
+import { AnatomicalGait, anatomicalJointPose, pelvisOffsets } from './animation.mjs?v=jump-ik-2';
+import { FootIK } from './foot-ik.mjs?v=jump-ik-2';
 
 const $ = (id) => document.getElementById(id);
 const MODEL_BASE = new URL('../assets/models/ms-human-700/', import.meta.url);
