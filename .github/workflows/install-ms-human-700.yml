@@ -1,0 +1,38 @@
+name: Install MS-Human-700 anatomical assets
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/install-ms-human-700.py'
+      - '.github/workflows/install-ms-human-700.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: nexus-human-assets
+  cancel-in-progress: false
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download and verify official anatomical model assets
+        run: |
+          python scripts/install-ms-human-700.py
+          node scripts/validate-model-assets.mjs assets/models/ms-human-700/model-manifest.json
+      - name: Commit complete verified anatomical assets to main
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/models/ms-human-700
+          if git diff --cached --quiet; then
+            echo 'No model changes to commit.'
+            exit 0
+          fi
+          git commit -m 'Install verified upstream MS-Human-700 anatomical assets'
+          git push origin HEAD:main
