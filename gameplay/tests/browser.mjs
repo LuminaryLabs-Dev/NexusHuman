@@ -30,6 +30,16 @@ try {
   await page.keyboard.down('w');
   await page.waitForTimeout(3000);
   await page.keyboard.up('w');
+  // Validate anatomical turn in the same browser that loaded the 700-actuator MJCF.
+  await page.keyboard.down('ArrowLeft');
+  await page.waitForTimeout(2500);
+  const turnDegrees = Number(await page.locator('#turn').innerText());
+  const gaitActivity = Number(await page.locator('#gait').innerText());
+  console.log('Anatomical turn telemetry:', {turnDegrees, gaitActivity});
+  assert.ok(turnDegrees > 30, 'Arrow-left must accelerate heading');
+  assert.ok(gaitActivity > 10, 'Turn-in-place must trigger a body stepping pose');
+  await page.screenshot({path:'gameplay/screenshots/anatomical-turn.png',fullPage:true});
+  await page.keyboard.up('ArrowLeft');
   const distance = await page.locator('#distance').innerText();
   const speed = await page.locator('#speed').innerText();
   const fps = await page.locator('#fps').innerText();
