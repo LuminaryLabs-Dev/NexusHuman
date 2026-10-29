@@ -74,3 +74,25 @@ test('camera follows behind forward movement at every turning angle', () => {
   }
   assert.throws(() => cameraFollowOffset(0, 0, 0), RangeError);
 });
+
+test('turning accelerates and decelerates without snapping', () => {
+  const m = new GameplayMotion();
+  m.step(1/120,{turnLeft:true});
+  const first = m.turnVelocity;
+  assert.ok(first>0 && first<2.5);
+  for(let i=0;i<90;i++)m.step(1/120,{turnLeft:true});
+  assert.ok(m.turnVelocity>first);
+  const before=m.heading;
+  m.step(1/120);
+  assert.ok(m.turnVelocity>0 && m.turnVelocity<2.5);
+  for(let i=0;i<120;i++)m.step(1/120);
+  assert.ok(m.turnVelocity<.01);
+  assert.ok(m.heading>before);
+});
+test('turning in place advances weight-transfer stepping phase',()=>{
+  const m=new GameplayMotion();
+  for(let i=0;i<150;i++)m.step(1/120,{turnRight:true});
+  assert.ok(m.phase>.5,'turn in place must create steps');
+  assert.ok(Math.abs(m.heading)>.5,'turn must rotate');
+  assert.ok(m.position.x===0 && m.position.y===0,'turn in place does not translate');
+});
