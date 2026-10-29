@@ -110,6 +110,17 @@ const modelRoot=new THREE.Group();scene.add(modelRoot);
 const boneMaterial=new THREE.MeshStandardMaterial({color:0xe7c8a5,roughness:.72,metalness:.06,side:THREE.DoubleSide});
 const skinMaterial=new THREE.MeshStandardMaterial({color:0xdba992,transparent:true,opacity:.18,roughness:.8,depthWrite:false,side:THREE.DoubleSide});
 const joints=[], meshJobs=[];
+// Read-only rig diagnostics for automated browser acceptance and game integration.
+window.NexusHumanDiagnostics=()=>{
+  const names=['pelvis_rotation','L5_S1_AR','T12_L1_AR','T1_head_neck_AR','hip_rotation_r','hip_rotation_l'];
+  const angles=Object.fromEntries(names.map(name=>{
+    const joint=joints.find(j=>j.name===name);
+    if(!joint)return [name,null];
+    const w=Math.max(-1,Math.min(1,Math.abs(joint.hinge.quaternion.w)));
+    return [name,2*Math.acos(w)];
+  }));
+  return {ready:modelReady,turnVelocity:motion.turnVelocity,pose:currentPose,angles};
+};
 let boneCount=0, actuatorCount=0, modelReady=false;
 function buildBody(node,parent,meshes) {
   const body=new THREE.Group();body.name=node.getAttribute('name')||'body';body.position.copy(vec3(node.getAttribute('pos')));body.quaternion.copy(quatOf(node.getAttribute('quat')));parent.add(body);
