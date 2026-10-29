@@ -46,6 +46,33 @@ try {
   console.log('Rig joint articulation (radians):',rig.angles);
   await page.screenshot({path:'gameplay/screenshots/anatomical-turn.png',fullPage:true});
   await page.keyboard.up('ArrowLeft');
+  // Exercise the entire physically staged jump against the real articulated rig.
+  await page.keyboard.press('r');
+  await page.waitForFunction(()=>window.NexusHumanDiagnostics()?.motion?.jumpStage==='grounded',undefined,{timeout:10000});
+  const idleFooting=await page.evaluate(()=>window.NexusHumanDiagnostics()?.footIK);
+  assert.equal(idleFooting?.chainCount,2,'Both anatomical foot IK chains must be available');
+  await page.keyboard.down('Space');
+  await page.waitForFunction(()=>window.NexusHumanDiagnostics()?.motion?.jumpStage==='airborne',undefined,{timeout:20000});
+  await page.keyboard.up('Space');
+  await page.waitForFunction(()=>window.NexusHumanDiagnostics()?.pose?.jumpSpread > .25,undefined,{timeout:20000});
+  const airborne=await page.evaluate(()=>window.NexusHumanDiagnostics());
+  assert.ok(airborne.motion.height>0,'Jump has physical upward displacement');
+  assert.ok(airborne.pose.jumpTuck>.1,'Airborne knees must tuck');
+  assert.ok(airborne.angles.knee_angle_r>.08,'Right knee bends in flight');
+  assert.ok(airborne.angles.knee_angle_l>.08,'Left knee bends in flight');
+  assert.ok(airborne.angles.hip_adduction_r>.02,'Right leg abducts in flight');
+  assert.ok(airborne.angles.hip_adduction_l>.02,'Left leg abducts in flight');
+  assert.equal(airborne.footIK.locked.r,false,'Right foot must release airborne');
+  assert.equal(airborne.footIK.locked.l,false,'Left foot must release airborne');
+  console.log('Airborne pose and planting:',{stage:airborne.motion.jumpStage,height:airborne.motion.height,
+    spread:airborne.pose.jumpSpread,tuck:airborne.pose.jumpTuck,feet:airborne.footIK,angles:airborne.angles});
+  await page.screenshot({path:'gameplay/screenshots/airborne-leg-spread.png',fullPage:true});
+  await page.waitForFunction(()=>['landing','grounded'].includes(window.NexusHumanDiagnostics()?.motion?.jumpStage)&&
+    window.NexusHumanDiagnostics()?.motion?.grounded,undefined,{timeout:45000});
+  const landed=await page.evaluate(()=>window.NexusHumanDiagnostics());
+  assert.ok(landed.motion.grounded,'Jump must return to solid floor');
+  assert.ok(landed.motion.contacts>=1,'Landing must produce a contact event');
+  console.log('Jump recovered:',{stage:landed.motion.jumpStage,contacts:landed.motion.contacts,feet:landed.footIK});
   const distance = await page.locator('#distance').innerText();
   const speed = await page.locator('#speed').innerText();
   const fps = await page.locator('#fps').innerText();
