@@ -21,7 +21,8 @@ jobs:
         run: |
           node --check gameplay/app.mjs
           node --check gameplay/animation.mjs
-          node --test gameplay/tests/motion.test.mjs gameplay/tests/animation.test.mjs
+          node --check gameplay/foot-ik.mjs
+          node --test gameplay/tests/motion.test.mjs gameplay/tests/animation.test.mjs gameplay/tests/foot-ik.test.mjs
           node scripts/validate-model-assets.mjs assets/models/ms-human-700/model-manifest.json
       - name: Install browser harness
         run: |
