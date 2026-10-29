@@ -13,7 +13,7 @@ page.on('pageerror', err => errors.push(err.message));
 try {
   const response = await page.goto(origin + '/gameplay/', { waitUntil: 'domcontentloaded' });
   assert.equal(response?.status(), 200);
-  await page.waitForFunction(() => document.querySelector('#progress')?.dataset.ready === 'true', { timeout: 120000 });
+  await page.waitForFunction(() => document.querySelector('#progress')?.dataset.ready === 'true', undefined, { timeout: 120000 });
   const result = await page.evaluate(() => ({
     bones: Number(document.querySelector('#bones')?.textContent.replaceAll(',', '')),
     joints: Number(document.querySelector('#joints')?.textContent.replaceAll(',', '')),
