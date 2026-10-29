@@ -18,4 +18,57 @@ $('#reset').onclick=reset;$('#pause').onclick=()=>{paused=!paused;$('#pause').te
 addEventListener('keydown',e=>{if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName))return;keys.add(e.key.toLowerCase());if(['w','a','s','d',' '].includes(e.key.toLowerCase()))e.preventDefault();if(e.repeat)return;if(e.key.toLowerCase()==='r')reset();if(e.key.toLowerCase()==='p')$('#pause').click();if(['1','2','3'].includes(e.key)){document.querySelectorAll('[data-view]')[Number(e.key)-1].click()}});addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));addEventListener('blur',()=>keys.clear());canvas.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY};canvas.setPointerCapture(e.pointerId)});canvas.addEventListener('pointermove',e=>{if(!drag)return;yaw+=(e.clientX-drag.x)*.006;pitch=Math.max(.12,Math.min(1.1,pitch+(e.clientY-drag.y)*.005));drag={x:e.clientX,y:e.clientY}});canvas.addEventListener('pointerup',()=>drag=null);
 function tick(now){const frameDt=Math.min(.06,Math.max(0,(now-last)/1000));last=now;dtMs=frameDt*1000;frames++;if(now-sample>=500){fps=Math.round(frames*1000/(now-sample));frames=0;sample=now;$('#fps').textContent=fps;$('#frametime').textContent=dtMs.toFixed(1)}if(!paused){let dx=Number(keys.has('d'))-Number(keys.has('a')),dz=Number(keys.has('s'))-Number(keys.has('w'));const mag=Math.hypot(dx,dz);if(mag){dx/=mag;dz/=mag}const run=keys.has('shift');const target=Math.max(.1,p.speed)*(run?1.6:1)*(.3+.7*p.strength/100);const response=Math.max(.2,Math.min(1,frameDt*(2+p.friction*5)));velocity.x+=(dx*target-velocity.x)*response;velocity.z+=(dz*target-velocity.z)*response;const multiplier=p.gravity<3?1.15:Math.max(.5,1-(p.gravity-9.81)*.025);const mx=velocity.x*frameDt*multiplier,mz=velocity.z*frameDt*multiplier;position.x=Math.max(-49,Math.min(49,position.x+mx));position.z=Math.max(-49,Math.min(49,position.z+mz));distance+=Math.hypot(mx,mz);walking+=Math.hypot(mx,mz)*3.1;$('#distance').textContent=distance.toFixed(1)}const lean=Math.min(.45,Math.hypot(velocity.x,velocity.z)*.07+p.push/2500);renderer.render({scene,view,p,position,walking,agents,height,yaw,pitch,lean});$('#coords').textContent=`X ${position.x.toFixed(1)} · Z ${position.z.toFixed(1)}`;$('#stability').textContent=p.friction<.15||p.push>350?'AT RISK':'STABLE';if(benchmark){benchmark.sum+=dtMs;benchmark.n++;benchmark.min=Math.min(benchmark.min,dtMs);benchmark.max=Math.max(benchmark.max,dtMs);if(benchmark.n%30===0)runData.push({seconds:+((now-benchmark.start)/1000).toFixed(2),fps,frameMs:+dtMs.toFixed(2),distance:+distance.toFixed(2)});const elapsed=(now-benchmark.start)/1000;if(elapsed>=30){benchmark.result={durationSeconds:elapsed,meanFrameMs:benchmark.sum/benchmark.n,minFrameMs:benchmark.min,maxFrameMs:benchmark.max,samples:benchmark.n,agents};$('#benchstatus').textContent=`Complete · ${benchmark.n} frames`;$('#benchmark').disabled=false}else $('#benchstatus').textContent=`Testing · ${Math.floor(elapsed)}/30s`;}requestAnimationFrame(tick)}
 buildParams();requestAnimationFrame(tick);
-</script></body></html>
+</script>
+<style>
+#anatomy-assets{position:fixed;right:16px;bottom:16px;z-index:30;background:#101f2ded;border:1px solid #42716f;border-radius:12px;color:#d9edf0;max-width:min(420px,calc(100vw - 32px));box-shadow:0 9px 25px #0007;font:13px/1.5 system-ui,sans-serif}
+#anatomy-assets summary{padding:12px 15px;cursor:pointer;color:#82f4df;font-weight:700;list-style:revert}
+#anatomy-assets .anatomy-content{padding:0 15px 14px;max-height:45vh;overflow-y:auto}
+#anatomy-assets p{margin:5px 0 10px;color:#b2c9cf}
+#anatomy-assets ul{margin:7px 0;padding-left:20px}
+#anatomy-assets a{color:#79e5dc}
+#anatomy-assets a:focus-visible,#anatomy-assets summary:focus-visible{outline:2px solid #7ef3d9;outline-offset:3px}
+</style>
+<details id="anatomy-assets">
+<summary>MS-Human-700 · Anatomical assets</summary>
+<div class="anatomy-content">
+<p id="anatomy-state" role="status">Checking locally hosted anatomical assets…</p>
+<ul id="anatomy-links"></ul>
+<p>The model files are available for download and integration. This preview still uses procedural movement, not MuJoCo muscle physics.</p>
+</div>
+</details>
+<script>
+(async function(){
+  const status=document.getElementById('anatomy-state');
+  const list=document.getElementById('anatomy-links');
+  const base=new URL('assets/models/ms-human-700/',document.baseURI);
+  try {
+    const response=await fetch(new URL('model-manifest.json',base),{cache:'no-cache'});
+    if(!response.ok)throw Error('HTTP '+response.status);
+    const manifest=await response.json();
+    if(!Array.isArray(manifest.files)||!Array.isArray(manifest.variants)||!manifest.files.includes('LICENSE'))throw Error('Incomplete manifest');
+    status.textContent=manifest.files.length+' anatomical model files installed · source revision '+String(manifest.commit||'unknown').slice(0,8);
+    for(const file of manifest.variants){
+      if(!manifest.files.includes(file)||typeof file!=='string'||file.includes('..')||file.startsWith('/'))continue;
+      const item=document.createElement('li');
+      const link=document.createElement('a');
+      link.href=new URL(file,base).href;
+      link.textContent=file;
+      link.target='_blank';
+      link.rel='noopener noreferrer';
+      item.append(link);
+      list.append(item);
+    }
+    const item=document.createElement('li');
+    const link=document.createElement('a');
+    link.href=new URL('model-manifest.json',base).href;
+    link.textContent='Complete file manifest + SHA-256 hashes';
+    link.target='_blank';
+    link.rel='noopener noreferrer';
+    item.append(link);
+    list.append(item);
+  } catch(error) {
+    status.textContent='Anatomical assets are not available from this deployment ('+error.message+').';
+  }
+})();
+</script>
+</body></html>
