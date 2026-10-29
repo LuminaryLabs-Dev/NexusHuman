@@ -33,7 +33,7 @@ export class AnatomicalGait {
     this.shift=smooth(this.shift,this.weight*0.017*Math.sin(this.phase)+0.025*this.lateral,8,dt);
     this.pitch=smooth(this.pitch,clamp(0.02+0.045*this.forward,-0.07,0.13)*this.weight,6,dt);
     this.roll=smooth(this.roll,clamp(0.075*this.lateral+0.11*this.turn,-0.18,0.18)*this.weight,7,dt);
-    this.twist=smooth(this.twist,clamp(this.turn*0.14+this.lateral*0.07,-0.24,0.24),7,dt);
+    this.twist=smooth(this.twist,clamp(this.turn*0.23+this.lateral*0.08,-0.30,0.30),7,dt);
     return this.snapshot();
   }
   snapshot(){return {speed:this.speed,forward:this.forward,lateral:this.lateral,turn:this.turn,weight:this.weight,activity:this.activity,bob:this.bob,shift:this.shift,pitch:this.pitch,roll:this.roll,twist:this.twist,phase:this.phase,grounded:this.grounded};}
@@ -46,10 +46,12 @@ export function anatomicalJointPose(name,pose){
   if(name==='pelvis_tilt')return pose.pitch*.60;
   if(name==='pelvis_list')return pose.roll*.70+Math.sin(pose.phase)*.015*move;
   if(name==='pelvis_rotation')return pose.twist*.45;
-  if(/^(?:L[1-5]_L[1-5]|L5_S1|T\d+_T\d+|T12_L1)_AR$/.test(name))return -pose.twist*.048;
+  if(name==='L5_S1_AR')return -pose.twist*.42;
+  if(name==='T12_L1_AR')return -pose.twist*.34;
+  if(/^(?:L[1-5]_L[1-5]|T\d+_T\d+)_AR$/.test(name))return -pose.twist*.048;
   if(/^(?:L[1-5]_L[1-5]|L5_S1|T\d+_T\d+|T12_L1)_LB$/.test(name))return -pose.roll*.055;
   if(/^(?:L[1-5]_L[1-5]|L5_S1|T\d+_T\d+|T12_L1)_FE$/.test(name))return pose.pitch*.043;
-  if(name==='T1_head_neck_AR')return pose.twist*.30;
+  if(name==='T1_head_neck_AR')return pose.twist*.42;
   if(name==='T1_head_neck_LB')return -pose.roll*.22;
   if(name==='T1_head_neck_FE')return -pose.pitch*.38;
   if(/^hip_flexion_[rl]$/.test(name))return hipWave*.43+(!pose.grounded?.12:0);
