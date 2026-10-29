@@ -11,11 +11,23 @@ test('forward movement and running work with deterministic fixed steps', () => {
   for (let i = 0; i < 360; i++) { a.step(1 / 120, {forward:true}); b.step(1 / 120, {forward:true, run:true}); }
   assert.ok(a.position.y > 4); assert.ok(b.position.y > a.position.y * 1.8); assert.equal(a.position.x, 0);
 });
-test('jump rises and settles back onto the floor', () => {
+test('jump crouches, launches, lands and recovers on the floor', () => {
   const m = new GameplayMotion(); m.step(1 / 120, {jump:true});
-  assert.ok(m.position.z > 0); assert.equal(m.grounded, false);
-  for (let i = 0; i < 240; i++) m.step(1 / 120);
-  assert.equal(m.position.z, 0); assert.equal(m.grounded, true);
+  assert.equal(m.jumpStage,'anticipation');assert.equal(m.position.z,0);
+  for (let i = 0; i < 19; i++) m.step(1 / 120);
+  assert.equal(m.jumpStage,'airborne');assert.ok(m.position.z > 0);
+  let reachedApex=false,landed=false;
+  for (let i=0;i<240;i++){const s=m.step(1/120);if(s.velocity.z<0&&s.height>0)reachedApex=true;if(s.jumpStage==='landing')landed=true;}
+  assert.ok(reachedApex);assert.ok(landed);
+  assert.equal(m.position.z, 0); assert.equal(m.grounded, true);assert.equal(m.jumpStage,'grounded');
+});
+test('holding jump cannot auto-repeat after the landing',()=>{
+  const m=new GameplayMotion();
+  for(let i=0;i<400;i++)m.step(1/120,{jump:true});
+  assert.equal(m.jumpStage,'grounded');assert.equal(m.position.z,0);
+  m.step(1/120,{jump:false});
+  m.step(1/120,{jump:true});
+  assert.equal(m.jumpStage,'anticipation');
 });
 test('obstacle radius prevents wall penetration', () => {
   const m = new GameplayMotion({obstacles: [{x:0, y:1.2, radius:.5, height:2}]});
