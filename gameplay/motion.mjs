@@ -53,7 +53,7 @@ export class GameplayMotion {
     }
     this.position.z += this.velocity.z * dt;
     if (this.position.z <= 0) {
-      if (this.velocity.z < 0) this.contacts++;
+      if (this.velocity.z < 0 && !this.grounded) this.contacts++;
       this.position.z = 0;
       this.velocity.z = 0;
       this.grounded = true;
